@@ -1,0 +1,189 @@
+modules:
+  jira:issuePanel:
+    - key: vouch-panel
+      resource: panel
+      resolver:
+        function: resolver
+      render: native
+      title: Vouch
+      icon: resource:static;icon.svg
+  jira:issueContext:
+    - key: vouch-context
+      resource: context
+      resolver:
+        function: resolver
+      render: native
+      title: Vouch
+      label: Questionnaire
+      description: Security questionnaire progress on this issue.
+      dynamicProperties:
+        function: context-status
+  jira:issueAction:
+    - key: vouch-answer
+      resource: action
+      resolver:
+        function: resolver
+      render: native
+      title: Answer with Vouch
+  jira:globalPage:
+    - key: vouch-home
+      resource: home
+      resolver:
+        function: resolver
+      render: native
+      title: Vouch
+      icon: resource:static;icon.svg
+  trigger:
+    - key: vouch-comment-events
+      function: on-comment
+      events:
+        - avi:jira:commented:issue
+  rovo:agent:
+    - key: vouch-agent
+      name: Vouch
+      description: Answers vendor security questionnaire questions from your own
+        Confluence policies and approved answers, with sources, and routes the
+        gaps to the right expert.
+      icon: resource:static;icon.svg
+      prompt: resource:prompts;agent.md
+      conversationStarters:
+        - Do we encrypt customer data at rest?
+        - How quickly do we notify customers of a breach?
+        - What's the status of the questionnaire on this issue?
+        - Which questions on this issue still need an expert?
+      actions:
+        - answer-security-question
+        - questionnaire-status
+        - route-question-to-expert
+  rovo:skill:
+    - key: answer-security-question-skill
+      source:
+        dir: skills/answer-security-question
+      dependencies:
+        tools:
+          - answer-security-question
+  action:
+    - key: answer-security-question
+      name: Answer a security question
+      function: action-answer
+      actionVerb: GET
+      description: Answer a vendor security questionnaire question from the company's
+        Confluence policies and approved answer library. Returns the answer
+        quoted from sources, a confidence (high, medium, none) and the sources.
+      inputs:
+        question:
+          title: Question
+          type: string
+          required: true
+          description: The security question, as the customer wrote it.
+    - key: questionnaire-status
+      name: Questionnaire status
+      function: action-status
+      actionVerb: GET
+      description: Progress of the security questionnaire on a Jira issue - answered,
+        approved, gaps, and which questions are with which experts.
+      inputs:
+        issueKey:
+          title: Jira issue key
+          type: string
+          required: false
+          description: The issue holding the questionnaire, e.g. SEC-12. Leave empty for
+            the current issue.
+    - key: route-question-to-expert
+      name: Route a question to an expert
+      function: action-route
+      actionVerb: CREATE
+      description: Send one unanswered questionnaire question to the best expert found
+        through the Teamwork Graph, as a Jira sub-task. Only when the user asks
+        to route it.
+      inputs:
+        issueKey:
+          title: Jira issue key
+          type: string
+          required: false
+          description: The questionnaire issue, e.g. SEC-12. Leave empty for the current
+            issue.
+        question:
+          title: Question
+          type: string
+          required: true
+          description: As the user gave it - a reference like GAP-03, a number like 14 (the 14th question), or words from it.
+  graph:connector:
+    - key: vouch-answer-library
+      name: Vouch answer library
+      icons:
+        light: resource:static;icon.svg
+        dark: resource:static;icon.svg
+      objectTypes:
+        - atlassian:document
+      capabilities:
+        replicatesPermissions: false
+        syncFidelity: mirror
+        supportsIncrementalSync: true
+      datasource:
+        onConnectionChange:
+          function: on-connection
+  llm:
+    - key: vouch-llm
+      model:
+        - claude
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: on-comment
+      handler: index.onCommentEvent
+    - key: context-status
+      handler: index.contextStatus
+    - key: action-answer
+      handler: index.answerQuestion
+    - key: action-status
+      handler: index.questionnaireStatus
+    - key: action-route
+      handler: index.routeQuestion
+    - key: on-connection
+      handler: index.onConnectionChange
+resources:
+  - key: panel
+    path: src/frontend/panel.jsx
+  - key: context
+    path: src/frontend/context.jsx
+  - key: action
+    path: src/frontend/action.jsx
+  - key: home
+    path: src/frontend/home.jsx
+  - key: static
+    path: static
+  - key: prompts
+    path: prompts
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - read:jira-user
+    - storage:app
+    - read:page:confluence
+    - write:page:confluence
+    - delete:page:confluence
+    - read:space:confluence
+    - search:confluence
+    - read:confluence-content.summary
+    - read:content-details:confluence
+    # Teamwork Graph reads: pages -> contributors (users), users -> teams.
+    - read:graph:page:confluence
+    - read:graph:user:atlassian
+    - read:graph:team:atlassian
+    # Teamwork Graph writes (graph:connector): approved answers as atlassian:document objects.
+    - read:object:jira
+    - write:object:jira
+    - delete:object:jira
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 512
+    architecture: arm64
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
+  id: ari:cloud:ecosystem::app/d011fddb-bba9-4465-b1fa-edd275734492

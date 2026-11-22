@@ -1,0 +1,26 @@
+{
+  "name": "vouch",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "lint": "eslint src/**/*",
+    "test": "node --test --experimental-test-module-mocks test/*.test.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "eslint-plugin-react-hooks": "^4.6.0"
+  },
+  "dependencies": {
+    "@forge/api": "^8.5.0",
+    "@forge/bridge": "7.3.0-next.12",
+    "@forge/kvs": "^2.1.2",
+    "@forge/llm": "^1.0.10",
+    "@forge/react": "12.5.0-next.2",
+    "@forge/resolver": "2.0.2",
+    "@forge/teamwork-graph": "^5.4.0",
+    "react": "^18.2.0"
+  },
+  "type": "module",
+  "description": "Vouch: answers vendor security questionnaires from your Confluence policies, with citations, and routes the gaps to experts found through the Teamwork Graph."
+}
