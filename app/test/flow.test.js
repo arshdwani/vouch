@@ -161,6 +161,7 @@ test('full flow on the sample questionnaire', async () => {
   for (const [i, x] of SAMPLE_LIBRARY.entries()) await store.saveLibraryEntry({ ...x, id: `sample-${i + 1}`, approvedAt: '2026-11-01T00:00:00Z', citations: [] });
   await graph.onConnectionChange({ action: 'CREATED', connectionId: 'conn-1', name: 'Vouch answer library' });
   assert.equal(graphObjects.size, 3, 'existing library pushed on connect');
+  assert.ok([...graphObjects.values()].every((o) => /^https:\/\/example\.atlassian\.net\//.test(o.url)), 'absolute links, even from the connection event');
 
   const imp = await svc.importQuestionnaire('SEC-1', '501', ME);
   assert.equal(imp.questions, 40);

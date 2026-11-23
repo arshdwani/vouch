@@ -4,6 +4,10 @@ import { asApp, asUser, route, assumeTrustedRoute } from '@forge/api';
 
 const as = (who) => (who === 'app' ? asApp() : asUser());
 
+// Confluence page links without the title slug (/spaces/KEY/pages/123): smart links (Rovo, Jira) resolve them to the
+// page title, while slugs with "+" and dashes sometimes render as a bare address.
+export const pageLink = (base, webui) => (webui ? `${base}${String(webui).replace(/(\/pages\/\d+)\/[^/?#]*$/, '$1')}` : null);
+
 async function json(res, what, product = 'Jira') {
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -237,7 +241,7 @@ export async function spacePages(keys, { who = 'user', maxPerSpace = 300 } = {})
         const data = await cjson(res, `Reading pages in ${s.name}`);
         const base = String(data._links?.base || '').replace(/\/$/, '');
         for (const p of data.results || []) {
-          pages.push({ id: p.id, title: p.title, url: p._links?.webui ? `${base}${p._links.webui}` : null, body: p.body?.storage?.value || '', spaceKey: s.key });
+          pages.push({ id: p.id, title: p.title, url: pageLink(base, p._links?.webui), body: p.body?.storage?.value || '', spaceKey: s.key });
           n++;
         }
         cursor = new URLSearchParams(String(data._links?.next || '').split('?')[1] || '').get('cursor');
@@ -256,7 +260,7 @@ export async function searchPagesWithBodies(cql, limit = 5, who = 'user') {
   const res = await as(who).requestConfluence(route`/wiki/rest/api/content/search?cql=${cql}&limit=${limit}&expand=body.storage,space`);
   const data = await cjson(res, 'Searching Confluence');
   const base = String(data._links?.base || '').replace(/\/$/, '');
-  return (data.results || []).map((p) => ({ id: p.id, title: p.title, url: p._links?.webui ? `${base}${p._links.webui}` : null, body: p.body?.storage?.value || '', spaceKey: p.space?.key }));
+  return (data.results || []).map((p) => ({ id: p.id, title: p.title, url: pageLink(base, p._links?.webui), body: p.body?.storage?.value || '', spaceKey: p.space?.key }));
 }
 
 /** CQL page search. Returns [{ id, title, url, spaceKey, createdBy, lastEditedBy }]. */
@@ -269,7 +273,7 @@ export async function searchPages(cql, limit = 10, who = 'user') {
     .map((x) => ({
       id: x.content.id,
       title: x.content.title,
-      url: x.url ? `${base}${x.url}` : x.content._links?.webui ? `${base}${x.content._links.webui}` : null,
+      url: pageLink(base, x.content._links?.webui || x.url),
       spaceKey: x.content.space?.key,
       spaceName: x.content.space?.name,
       createdBy: x.content.history?.createdBy ? { accountId: x.content.history.createdBy.accountId, name: x.content.history.createdBy.displayName } : null,

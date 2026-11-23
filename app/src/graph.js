@@ -3,8 +3,11 @@
 // a site admin (Administration -> Apps -> Connected apps -> Vouch -> Connections); onConnectionChange stores its id.
 import { graph } from '@forge/teamwork-graph';
 import * as store from './store.js';
+import { siteUrl as getSiteUrl } from './products.js';
 
 const ID_PREFIX = 'vouch-answer-';
+// Public icon for search results (an image link the viewer's browser loads; Vouch itself makes no outbound call).
+const ICON_URL = 'https://raw.githubusercontent.com/arshdwani/vouch/main/brand/icon-512.png';
 
 export function toDocument(entry, { siteUrl = '', appPath = '/jira/apps' } = {}) {
   const text = `Question: ${entry.question}\n\nApproved answer: ${entry.short ? `${entry.short}. ` : ''}${entry.text}` +
@@ -13,7 +16,8 @@ export function toDocument(entry, { siteUrl = '', appPath = '/jira/apps' } = {})
   return {
     schemaVersion: '1.0',
     id: `${ID_PREFIX}${entry.id}`,
-    updateSequenceNumber: Date.parse(at) || Date.now(),
+    // Must grow with every write, or the graph keeps the older copy.
+    updateSequenceNumber: Date.now(),
     displayName: `Security answer: ${entry.question}`.slice(0, 255),
     description: `${entry.short ? `${entry.short}. ` : ''}${entry.text}`.slice(0, 1000),
     // The questionnaire the answer was approved on, else the Vouch answer library.
@@ -24,7 +28,7 @@ export function toDocument(entry, { siteUrl = '', appPath = '/jira/apps' } = {})
     // Answers are approved for anyone on the site to reuse, so they are visible to the whole workspace.
     permissions: [{ accessControls: [{ principals: [{ type: 'ATLASSIAN_WORKSPACE' }] }] }],
     'atlassian:document': {
-      type: { category: 'DOCUMENT', mimeType: 'text/plain' },
+      type: { category: 'DOCUMENT', mimeType: 'text/plain', iconUrl: ICON_URL },
       content: { mimeType: 'text/plain', text },
       labels: ['vouch', 'security-questionnaire', ...(entry.tags || [])].slice(0, 10),
     },
@@ -36,6 +40,10 @@ export async function syncEntries(entries, opts = {}) {
   const conn = await store.getConnection();
   if (!conn?.connectionId) return { ok: false, connected: false, written: 0, error: 'No Teamwork Graph connection yet.' };
   if (!entries.length) return { ok: true, connected: true, written: 0 };
+  // Graph documents need absolute links. Events (like the connection being created) have no user, so ask as the app.
+  if (!opts.siteUrl) opts = { ...opts, siteUrl: await getSiteUrl('app').catch(() => '') };
+  if (!opts.appPath) opts = { ...opts, appPath: (await store.getMeta('appPath').catch(() => null)) || undefined };
+  if (!/^https:\/\//.test(opts.siteUrl || '')) return { ok: false, connected: true, written: 0, error: 'Could not work out the site address for answer links.' };
   try {
     let written = 0;
     for (let i = 0; i < entries.length; i += 100) {

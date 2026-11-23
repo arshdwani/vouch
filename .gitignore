@@ -3,3 +3,4 @@ node_modules/
 video/out/
 *.mp4
 .env*
+.install-link.txt

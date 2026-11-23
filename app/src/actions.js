@@ -28,7 +28,8 @@ function sourcesOf(citations = []) {
     if (c.heading && !x.sections.includes(c.heading)) x.sections.push(c.heading);
     out.set(key, x);
   }
-  return [...out.values()];
+  // A ready-made markdown link, so the agent shows the page title rather than the raw address.
+  return [...out.values()].map((x) => ({ ...x, markdown: x.url ? `[${x.title}](${x.url})` : x.title }));
 }
 
 // answer-security-question (GET)
